@@ -51,9 +51,9 @@ User → Slash Command → Skills → Python + ZOS-API → Results
 
 ## Prerequisites
 
-- **Zemax OpticStudio 2025 R2 (v252)** installed at `C:\Apps\ANSYS Inc\v252\Zemax OpticStudio`
+- **Zemax OpticStudio 2025 R2 (v252)**
 - **Professional or Premium license** (Standard edition has limited API support)
-- **Python 3.14 64-bit** at `C:\Users\Lex\AppData\Local\Python\pythoncore-3.14-64\python.exe`
+- **Python 3.14 64-bit**
 - Python packages: `pythonnet`, `numpy`, `matplotlib`
 
 ## Installation
@@ -61,8 +61,11 @@ User → Slash Command → Skills → Python + ZOS-API → Results
 Copy the plugin directory to your Claude Code plugins:
 
 ```powershell
-# For project-local use, the plugin is already in:
-C:\Users\Lex\Desktop\AutoSim\AutoZemax\
+# Step 1: Add the marketplace
+/plugin marketplace add Lex669/AutoSim
+
+# Step 2: Install the plugin
+/plugin install AutoZemax@AutoSim
 ```
 
 Or install globally via marketplace (when published).
@@ -143,4 +146,3 @@ See `references/zos-api-reference.md` for:
 ## License
 
 MIT
->>>>>>> a13d4f4 (docs: create the plugin)
