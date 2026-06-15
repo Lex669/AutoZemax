@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-
 # AutoZemax — Zemax OpticStudio Automation Plugin
 
 Automate the complete Zemax optical design workflow — from modeling through
