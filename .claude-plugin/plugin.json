@@ -8,6 +8,6 @@
   "license": "MIT",
   "keywords": ["zemax", "optics", "lens-design", "simulation", "zos-api", "opticstudio"],
   "commands": "./commands",
-  "agents": "./agents",
+  "agents": ["./agents"],
   "skills": "./skills"
 }
