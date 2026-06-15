@@ -1,0 +1,13 @@
+{
+  "name": "autozemax",
+  "version": "0.1.0",
+  "description": "Zemax OpticStudio automation plugin — modeling, simulation, optimization, tolerance analysis, and data processing via ZOS-API",
+  "author": {
+    "name": "xiaoxin_robotech"
+  },
+  "license": "MIT",
+  "keywords": ["zemax", "optics", "lens-design", "simulation", "zos-api", "opticstudio"],
+  "commands": "./commands",
+  "agents": "./agents",
+  "skills": "./skills"
+}

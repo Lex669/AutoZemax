@@ -1,0 +1,17 @@
+# Plugin settings (user-specific)
+.claude/*.local.md
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Zemax output
+*.zos.tmp
+ZemaxAPI_*.log
+
+# IDE
+.vscode/
+.idea/
