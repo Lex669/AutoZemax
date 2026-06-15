@@ -6,8 +6,5 @@
     "name": "xiaoxin_robotech"
   },
   "license": "MIT",
-  "keywords": ["zemax", "optics", "lens-design", "simulation", "zos-api", "opticstudio"],
-  "commands": "./commands",
-  "agents": ["./agents"],
-  "skills": "./skills"
+  "keywords": ["zemax", "optics", "lens-design", "simulation", "zos-api", "opticstudio"]
 }
