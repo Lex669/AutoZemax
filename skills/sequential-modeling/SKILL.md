@@ -14,10 +14,23 @@ F/# solves, variable setup, and surface comments.
 
 ```python
 import sys, os
-# Use CLAUDE_PLUGIN_ROOT set by Claude Code at runtime
-_plugin_root = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
-if _plugin_root:
-    sys.path.insert(0, os.path.join(_plugin_root, 'scripts'))
+# Robust import: tries CLAUDE_PLUGIN_ROOT env var first,
+# then falls back to cache path and dev path
+_PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
+_SCRIPTS_PATH = None
+if _PLUGIN_ROOT:
+    _SCRIPTS_PATH = os.path.join(_PLUGIN_ROOT, 'scripts')
+else:
+    _CANDIDATES = [
+        r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.1.0\scripts',
+        r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
+    ]
+    for _p in _CANDIDATES:
+        if os.path.isdir(_p):
+            _SCRIPTS_PATH = _p
+            break
+if _SCRIPTS_PATH:
+    sys.path.insert(0, _SCRIPTS_PATH)
 from zos_utils import ZOSConnection
 ```
 

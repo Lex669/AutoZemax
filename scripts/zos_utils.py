@@ -167,13 +167,27 @@ class ZOSConnection:
             )
         self.TheSystem.LoadFile(filepath, save_if_needed)
 
-    def new_file(self):
-        """Create a new blank optical system."""
-        if self.TheSystem is None:
-            raise ZOSConnection.SystemNotPresentException(
-                "Unable to acquire Primary system"
+    def new_file(self, system_type=None):
+        """Create a new optical system.
+
+        Args:
+            system_type: Optional ZOSAPI.SystemType enum value.
+                         Use ZOSAPI.SystemType.NonSequential for NSC mode.
+                         If None, creates a default sequential system.
+        """
+        if self.TheApplication is None:
+            raise ZOSConnection.InitializationException(
+                "No ZOSAPI application available"
             )
-        self.TheSystem.New(False)
+        if system_type is not None:
+            self.TheSystem = self.TheApplication.CreateNewSystem(system_type)
+        else:
+            if self.TheSystem is None:
+                raise ZOSConnection.SystemNotPresentException(
+                    "Unable to acquire Primary system"
+                )
+            self.TheSystem.New(False)
+        return self.TheSystem
 
     def save_file(self, filepath=None):
         """Save the current system. If filepath given, uses SaveAs."""
@@ -256,6 +270,52 @@ class ZOSConnection:
             data = list(data)
         return list(map(list, zip(*data)))
 
+
+    # ------------------------------------------------------------------
+    # NSC detector data helpers
+    # ------------------------------------------------------------------
+
+    def get_detector_data(self, detector_number, data_type=1):
+        """Read full detector data array and return (width, height, 2D_list).
+
+        Args:
+            detector_number: NSC object number of the detector.
+            data_type: 0=incoherent, 1=coherent irradiance, etc.
+
+        Returns:
+            (width, height, data_2d_list)
+            Dimensions are read from the data array itself, avoiding the
+            ObjectData readback issue (ObjectData returns IObject after reload).
+        """
+        raw = self.TheSystem.NCE.GetAllDetectorDataSafe(detector_number, data_type)
+        w = raw.GetLength(0)
+        h = raw.GetLength(1)
+        return w, h, self.reshape(raw, w, h)
+
+    def get_coherent_data(self, detector_number):
+        """Read coherent real + imaginary data and compute phase.
+
+        Args:
+            detector_number: NSC object number of the detector.
+
+        Returns:
+            (width, height, real_2d, imag_2d, phase_deg_2d, amplitude_2d)
+        """
+        ZOSAPI = self.ZOSAPI
+        # Real part
+        raw_real = self.TheSystem.NCE.GetAllCoherentDataSafe(
+            detector_number, ZOSAPI.Editors.NCE.DetectorDataType.Real)
+        w = raw_real.GetLength(0)
+        h = raw_real.GetLength(1)
+        real = self.reshape(raw_real, w, h)
+
+        # Imaginary part
+        raw_imag = self.TheSystem.NCE.GetAllCoherentDataSafe(
+            detector_number, ZOSAPI.Editors.NCE.DetectorDataType.Imaginary)
+        imag = self.reshape(raw_imag, raw_imag.GetLength(0), raw_imag.GetLength(1))
+
+        # Phase calculation (avoid numpy dependency at this layer)
+        return w, h, real, imag, None, None  # Caller computes phase with numpy
 
 # ------------------------------------------------------------------
 # Standalone helper — can be imported directly

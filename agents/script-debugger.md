@@ -45,7 +45,12 @@ diagnose and fix errors in AutoZemax Python scripts that use the ZOS-API.
 | `System.Double[,]` to list conversion error | Forgot to reshape .NET data | Use `zos.reshape(data, x, y)` |
 | `System.Int32` cannot be passed | Python int not compatible | Use `System.Int32(value)` from `from System import Int32` |
 | `plt.show()` hangs or crashes | ZOS connection still open | Close ZOS connection before plotting |
-| `ModuleNotFoundError: No module named 'clr'` | Wrong Python interpreter | Use `the Python interpreter (see `references/environment.md` for path)` |
+| `ModuleNotFoundError: No module named 'clr'` | Wrong Python interpreter | Use the Python interpreter from environment.md |
+| `AttributeError: 'IObject' has no attribute 'NumberXPixels'` | ObjectData returns generic IObject after save/reload | Read dimensions from GetDetectorData array instead: `raw.GetLength(0)` |
+| `AttributeError: 'INCERow' has no attribute 'TiltX'` | Wrong property name; pythonnet silently ignores TiltX/TiltY/TiltZ | Use `TiltAboutX`, `TiltAboutY`, `TiltAboutZ` |
+| Zero signal on all detectors (irradiance all zeros) | Wrong NSC object types: StandardLens is NOT a mirror; no coating on beam splitter | Use `Rectangle`+`MIRROR` for mirrors; use `PolygonObject`+`splitter.pob` for beam splitters |
+| `AttributeError: WavelengthPreset` under `ZOSAPI.Editors` | Wrong namespace for WavelengthPreset enum | Use `ZOSAPI.SystemData.WavelengthPreset` |
+| `numpy.ndarray` has no attribute `ptp` | NumPy >=2.0 removed `ndarray.ptp()` | Use `np.ptp(arr)` or `arr.max() - arr.min()` |
 
 **Output Format:**
 

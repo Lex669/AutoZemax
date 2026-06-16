@@ -116,8 +116,12 @@ analyses.New_Analysis(AnalysisIDM.RayFan)        # Ray fan
 ### INSCEditorRow
 - `ObjectData` — Object properties
 - `XPosition`, `YPosition`, `ZPosition` — Placement
-- `TiltX`, `TiltY`, `TiltZ` — Orientation
+- `TiltAboutX`, `TiltAboutY`, `TiltAboutZ` — Orientation (degrees).
+  CRITICAL: `TiltX`/`TiltY`/`TiltZ` do NOT exist on the .NET interface;
+  pythonnet will silently create Python-only attributes that are ignored
+  by Zemax. Always use `TiltAboutX`/`TiltAboutY`/`TiltAboutZ`.
 - `Material` — Material name
+- `Coating` — Coating name (e.g. "I.50" for 50% intensity split)
 
 ## Optimization
 
@@ -181,7 +185,9 @@ analyses.New_Analysis(AnalysisIDM.RayFan)        # Ray fan
 ## Enums Quick Reference
 
 - **FieldType**: Angle, ObjectHeight, ParaxialImageHeight, RealImageHeight
-- **WavelengthPreset**: d_0p587, F_0p486, C_0p656, etc.
+- **WavelengthPreset** (in `ZOSAPI.SystemData`, NOT `ZOSAPI.Editors`):
+  `d_0p587`, `F_0p486`, `C_0p656`, `HeNe_0p6328`, `FdC_Visible`, etc.
+  Usage: `TheSystem.SystemData.Wavelengths.SelectWavelengthPreset(ZOSAPI.SystemData.WavelengthPreset.HeNe_0p6328)`
 - **SolveType**: FNumber, MarginalRayAngle, PickUp, etc.
 - **OptimizationAlgorithm**: DampedLeastSquares, OrthoDescent
 - **OptimizationCycles**: Automatic, Fixed
