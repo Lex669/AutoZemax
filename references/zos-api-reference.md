@@ -1,6 +1,7 @@
-# ZOS-API Quick Reference
+# ZOS-API Quick Reference (v0.2.0)
 
 Key classes and methods from the Zemax OpticStudio API (v252).
+For library wrappers, see `scripts/zos_utils.py`.
 
 ## Connection & Application
 
@@ -21,7 +22,7 @@ TheSystem = TheApplication.PrimarySystem
 ## System Operations
 
 ### ISystem — Core
-- `LoadFile(filepath, saveIfNeeded)` — Open .zos file
+- `LoadFile(filepath, saveIfNeeded)` — Open .zos/.zmx/.zda file
 - `New(flag)` — Create new system
 - `Save()` / `SaveAs(filepath)` — Save system
 - `Close(save)` — Close system
@@ -182,13 +183,99 @@ analyses.New_Analysis(AnalysisIDM.RayFan)        # Ray fan
 - `OutputFileName` — Full output path
 - `Run()` / `WaitWithTimeout(seconds)` / `Cancel()` / `Close()`
 
+## Multi-Configuration
+
+### IMultiConfigEditor (MCE)
+- `NumberOfConfigurations` — int
+- `AddConfiguration(configNum)` — Add configuration
+- `GetOperand(configNum, operandType)` — Returns IMCERow
+- `GetOperandValue(configNum, operandType)` — Read current value
+
+### Common Multi-Config Operand Types
+- `THIC` — Thickness
+- `CRVT` — Curvature (1/radius)
+- `PRAM` — Aspheric parameter
+- `WLWT` — Wavelength weight
+- `TEXI` — Tilt/Decenter X
+- `GLAS` — Glass type
+- `SDIA` — Semi-diameter
+- `COFN` — Configuration offset
+
+## NSC Scattering & Phosphors
+
+### Volume Physics (per object)
+```python
+obj = TheNCE.GetObjectAt(n)
+vp = obj.VolumePhysics  # IVolumePhysics
+```
+- `ScatteringModel` — 0=None, 1=Mie, 2=Rayleigh, 4=Phosphor
+- `MieAnisotropy` — g factor (-1 to 1)
+- `MeanPath` — Mean free path (mm)
+- `ParticlesPerCubicMm` — Particle density
+- `PhosphorQuantumEfficiency` — QE (0-1)
+
+### Phosphor Wavelength Setup
+- Excitation wavelength as system wavelength 1
+- Emission wavelengths as wavelengths 2+
+- DetectorVolume with phosphor scattering for conversion measurement
+
+## Diffraction Gratings
+
+```python
+surface = TheLDE.GetSurfaceAt(n)
+surface.ChangeType(ZOSAPI.Editors.LDE.SurfaceType.DiffractionGrating)
+surface.GetCellAt(12).DoubleValue = lines_per_um  # 0.5 = 2 µm period
+surface.GetCellAt(13).IntegerValue = order          # Diffraction order
+```
+
+## CAD Import (NSC)
+
+```python
+# Via library:
+obj = zos.import_cad(filename, cad_format='STEP', obj_number=1, material='MIRROR')
+
+# Direct API:
+TheNCE.ImportCADFile(filename, ZOSAPI.Editors.NCE.CADImportFormat.STEP, objNum)
+```
+
+## NSC Detector Data Types
+
+| Data Type | Value | Description |
+|-----------|-------|-------------|
+| Incoherent Irradiance | 0 | Total power per pixel |
+| Coherent Irradiance | 1 | Phase-aware irradiance |
+| Coherent Phase | 2 | Phase distribution |
+| Real Part | 3 | Real field component |
+| Imaginary Part | 4 | Imaginary field component |
+
+## Library Wrapper Reference (zos_utils.py v0.2.0)
+
+For common operations, use library wrappers instead of raw API:
+
+| Library Function | Raw API Equivalent |
+|-----------------|-------------------|
+| `zos.extract_mtf_data(results)` | Manual DataSeries iteration |
+| `zos.extract_spot_data(results)` | SpotData.GetRMSSpotSizeFor() |
+| `zos.extract_wavefront_data(results)` | DataSeries + safe_reshape() |
+| `zos.create_nsc_detector(n, type, ...)` | NCE.GetObjectAt + ChangeType + cell config |
+| `zos.create_nsc_source(n, type, ...)` | NCE.GetObjectAt + ChangeType + cell config |
+| `zos.run_dls_optimization(cycles)` | OpenLocalOptimization + RunAndWaitForCompletion |
+| `zos.run_hammer_optimization(timeout)` | OpenHammerOptimization + correct cancel logic |
+| `zos.run_tolerance_sensitivity()` | OpenTolerancing + SetSensitivity |
+| `zos.run_tolerance_monte_carlo(n)` | OpenTolerancing + SetMonteCarlo |
+| `zos.export_cad(filename, format)` | OpenCadExport + format/cells setup |
+| `zos.import_cad(filename, format, n)` | NCE.ImportCADFile |
+| `plot_mtf(data, title)` | matplotlib boilerplate |
+| `plot_spot_diagram(data, title)` | matplotlib bar chart |
+| `plot_detector_data(data_2d, title)` | matplotlib imshow |
+
 ## Enums Quick Reference
 
+- **SystemType**: Sequential, NonSequential
 - **FieldType**: Angle, ObjectHeight, ParaxialImageHeight, RealImageHeight
-- **WavelengthPreset** (in `ZOSAPI.SystemData`, NOT `ZOSAPI.Editors`):
+- **WavelengthPreset** (in `ZOSAPI.SystemData`):
   `d_0p587`, `F_0p486`, `C_0p656`, `HeNe_0p6328`, `FdC_Visible`, etc.
-  Usage: `TheSystem.SystemData.Wavelengths.SelectWavelengthPreset(ZOSAPI.SystemData.WavelengthPreset.HeNe_0p6328)`
-- **SolveType**: FNumber, MarginalRayAngle, PickUp, etc.
+- **SolveType**: FNumber, MarginalRayAngle, PickUp, Position, etc.
 - **OptimizationAlgorithm**: DampedLeastSquares, OrthoDescent
 - **OptimizationCycles**: Automatic, Fixed
 - **CADFileType**: STEP, IGES, SAT, STL
@@ -196,3 +283,10 @@ analyses.New_Analysis(AnalysisIDM.RayFan)        # Ray fan
 - **SplineSegmentsType**: N_032 through N_256
 - **SetupModes**: Sensitivity, InverseSensitivity, MonteCarlo
 - **Criterions**: RMSSpotRadius, RMSWavefront, MTF, etc.
+- **NSC Object Types**: SourceElliptical, SourcePoint, SourceCollimated, SourceRectangle, DetectorRectangle, DetectorSurface, DetectorVolume, CADPart, etc.
+- **Surface Type**: Standard, EvenAspheric, DiffractionGrating, CoordinateBreak, etc.
+- **ScatteringModel**: None=0, Mie=1, Rayleigh=2, Phosphor=4
+- **ApodizationType**: 0=Uniform, 1=Gaussian, 2=CosineCubed
+- **AnalysisIDM**: StandardSpot, FFTMTF, FFTPSF, WavefrontMap, RayFan, FieldCurvatureDistortion, LateralColor, RMSWavefront
+- **DetectorDataType** (for `GetAllDetectorDataSafe`): 0=Incoherent, 1=Coherent, 2=Phase, 3=Real, 4=Imaginary
+- **MultiConfigOperandType**: THIC, CRVT, PRAM, WLWT, TEXI, GLAS, SDIA, COFN

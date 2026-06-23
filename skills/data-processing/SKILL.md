@@ -1,234 +1,341 @@
-﻿---
+---
 name: data-processing
-description: This skill should be used when the user asks to "plot MTF", "generate analysis report", "process simulation data", "visualize results", "plot spot diagram", "create analysis chart", "export data to CSV", "make performance report", "analyze optical performance", "generate plots from Zemax data", or processes and visualizes Zemax simulation output.
-version: 0.1.0
+description: This skill should be used when the user asks to "plot MTF", "plot spot", "plot wavefront", "plot detector", "plot CDF", "generate report", "visualize results", "save figure", "export chart", "matplotlib plot", "publish figure", "data visualization", "export figure", or creates publication-quality plots and reports from Zemax optical simulation data.
+version: 0.2.0
 ---
 
-# Data Processing & Visualization
+# Data Processing — Plots, Figures & Reports
 
-Extract, process, analyze, and visualize simulation results using
-numpy and matplotlib. Generate performance reports and export data.
+Generate publication-quality visualizations from Zemax analysis results
+using library plot functions and custom matplotlib templates. Supports
+MTF curves, spot diagrams, wavefront maps, ray fans, NSC detector data,
+tolerance CDFs, and multi-panel report figures.
 
 ## Prerequisites
 
 ```python
 import sys, os
-# Robust import: tries CLAUDE_PLUGIN_ROOT env var first,
-# then falls back to cache path and dev path
 _PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
-_SCRIPTS_PATH = None
-if _PLUGIN_ROOT:
-    _SCRIPTS_PATH = os.path.join(_PLUGIN_ROOT, 'scripts')
-else:
-    _CANDIDATES = [
-        r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.1.0\scripts',
-        r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
-    ]
-    for _p in _CANDIDATES:
-        if os.path.isdir(_p):
-            _SCRIPTS_PATH = _p
-            break
-if _SCRIPTS_PATH:
-    sys.path.insert(0, _SCRIPTS_PATH)
-from zos_utils import ZOSConnection
-import numpy as np
-import matplotlib.pyplot as plt
+for _p in [
+    os.path.join(_PLUGIN_ROOT, 'scripts') if _PLUGIN_ROOT else '',
+    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.2.0\scripts',
+    r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
+]:
+    if _p and os.path.isdir(_p):
+        sys.path.insert(0, _p); break
+from zos_utils import (
+    ZOSConnection, set_seed,
+    plot_mtf, plot_spot_diagram, plot_wavefront_map,
+    plot_ray_fan, plot_detector_data, plot_tolerance_cdf
+)
+
+set_seed(42)
 ```
 
-Execute with the Python interpreter documented in `references/environment.md`.
+Execute with:
+```
+& "C:\Users\Lex\AppData\Local\Python\pythoncore-3.14-64\python.exe" <script>.py
+```
 
-## Core Patterns
+## CRITICAL WARNING: Connection vs. Matplotlib Conflict
 
-### Data Flow
+**Never call `plt.show()` inside a `with ZOSConnection():` block.**
+The .NET interop will crash or hang when matplotlib displays a window.
+Always close the connection before showing figures:
 
-Data extraction (`.NET` array → Python) is handled by the `analysis` skill.
-This skill takes already-extracted Python data and processes it.
+```python
+# WRONG — will crash:
+with ZOSConnection() as zos:
+    # ... run analysis ...
+    plt.show()  # CRASH: .NET interop conflict
 
-### Plotting with matplotlib
+# CORRECT:
+with ZOSConnection() as zos:
+    # ... run analysis, extract data ...
+    zos.close()      # Release .NET resources
 
-Always save figures to files (`plt.savefig()`) for reliability.
-Use `plt.show()` only in interactive environments.
+plt.show()           # Safe after connection is closed
+```
+
+For non-interactive use (scripts, automated reports), always use
+`plt.savefig()` instead of `plt.show()` — this avoids the conflict
+entirely.
+
+## Library Plot Functions
+
+All library plot functions share the same interface pattern:
+- `save_path`: If provided, saves figure to disk (recommended).
+- `show`: If True, calls `plt.show()`. Default False — use `zos.close()` first.
+- Return `(fig, ax)` for further customization.
+
+### MTF Plot
+
+Extract MTF data using the analysis skill, then plot:
+
+```python
+with ZOSConnection() as zos:
+    ZOSAPI = zos.ZOSAPI
+    TheSystem = zos.TheSystem
+
+    # Run MTF analysis
+    mtf = TheSystem.Analyses.New_FftMtf()
+    mtf_settings = mtf.GetSettings()
+    mtf_settings.MaximumFrequency = 80
+    mtf_settings.SampleSize = ZOSAPI.Analysis.SampleSizes.S_256x256
+    mtf.ApplyAndWaitForCompletion()
+
+    # Extract data
+    mtf_data = zos.extract_mtf_data(mtf.GetResults())
+    zos.close()
+
+# Plot with diffraction limit marker
+plot_mtf(
+    mtf_data,
+    title='Double Gauss — FFT MTF',
+    save_path='mtf_plot.png',
+    show=False,
+    diffraction_limit_freq=72.3  # cycles/mm (optional marker)
+)
+```
+
+### Spot Diagram Bar Chart
+
+```python
+with ZOSConnection() as zos:
+    spot = zos.TheSystem.Analyses.New_Analysis(
+        zos.ZOSAPI.Analysis.AnalysisIDM.StandardSpot)
+    spot.ApplyAndWaitForCompletion()
+    spot_data = zos.extract_spot_data(spot.GetResults())
+    zos.close()
+
+plot_spot_diagram(
+    spot_data,
+    title='RMS vs GEO Spot Size by Field',
+    save_path='spot_summary.png'
+)
+```
+
+### Wavefront Map
+
+```python
+with ZOSConnection() as zos:
+    wf = zos.TheSystem.Analyses.New_Analysis(
+        zos.ZOSAPI.Analysis.AnalysisIDM.WavefrontMap)
+    wf.ApplyAndWaitForCompletion()
+    wf_data = zos.extract_wavefront_data(wf.GetResults())
+    zos.close()
+
+plot_wavefront_map(
+    wf_data,
+    grid_index=0,
+    title='Wavefront Map — Field 1',
+    save_path='wavefront.png',
+    cmap='RdBu_r'
+)
+```
+
+### Ray Fan Plot
+
+```python
+with ZOSConnection() as zos:
+    fan = zos.TheSystem.Analyses.New_Analysis(
+        zos.ZOSAPI.Analysis.AnalysisIDM.RayFan)
+    fan.ApplyAndWaitForCompletion()
+    fan_data = zos.extract_ray_fan_data(fan.GetResults())
+    zos.close()
+
+plot_ray_fan(
+    fan_data,
+    title='Ray Fan — All Fields',
+    save_path='ray_fan.png'
+)
+```
+
+### NSC Detector Data
+
+```python
+with ZOSConnection() as zos:
+    TheNCE = zos.TheSystem.NCE
+    TheNCE.ClearDetectors()
+    TheNCE.TraceAll()
+
+    w, h, detector_data = zos.get_detector_data(2)
+    zos.close()
+
+plot_detector_data(
+    detector_data,
+    title='NSC Detector Irradiance',
+    save_path='detector.png',
+    cmap='inferno',
+    x_extent=10.0,
+    y_extent=10.0
+)
+```
+
+### Tolerance CDF
+
+```python
+with ZOSConnection() as zos:
+    stats = zos.run_tolerance_monte_carlo(n_trials=200)
+    zos.close()
+
+plot_tolerance_cdf(
+    stats,
+    title='Manufacturing Yield — CDF (200 trials)',
+    save_path='tolerance_cdf.png'
+)
+```
+
+## Custom Matplotlib Patterns
+
+When the library plot functions do not provide enough control, build
+custom figures with matplotlib directly.
+
+### Multi-Panel Report Figure
 
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Data should already be extracted by the analysis skill
-# Example: mtf_data = [{'frequency': [...], 'tangential': [...], 'sagittal': [...]}, ...]
+with ZOSConnection() as zos:
+    ZOSAPI = zos.ZOSAPI
+    TheSystem = zos.TheSystem
 
-plt.figure(figsize=(8, 6))
-plt.plot(mtf_data[0]['frequency'], mtf_data[0]['tangential'], 'b', label='0° T')
-plt.plot(mtf_data[0]['frequency'], mtf_data[0]['sagittal'], 'b--', label='0° S')
-plt.title('FFT MTF')
-plt.xlabel('Spatial Frequency (cycles/mm)')
-plt.ylabel('Modulus of the OTF')
-plt.grid(True)
-plt.legend()
-plt.savefig('mtf_plot.png', dpi=150)
+    mtf = TheSystem.Analyses.New_FftMtf()
+    mtf.GetSettings().MaximumFrequency = 80
+    mtf.ApplyAndWaitForCompletion()
+    mtf_data = zos.extract_mtf_data(mtf.GetResults())
+
+    wf = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.WavefrontMap)
+    wf.ApplyAndWaitForCompletion()
+    wf_data = zos.extract_wavefront_data(wf.GetResults())
+
+    spot = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.StandardSpot)
+    spot.ApplyAndWaitForCompletion()
+    spot_data = zos.extract_spot_data(spot.GetResults())
+    zos.close()
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+# MTF (top-left)
+ax = axes[0, 0]
+for e in mtf_data:
+    ax.plot(e['frequency'], e['tangential'], label=f"F{e['field']} T")
+    ax.plot(e['frequency'], e['sagittal'], '--', label=f"F{e['field']} S")
+ax.set_xlabel('Frequency (c/mm)'); ax.set_ylabel('MTF')
+ax.set_title('FFT MTF'); ax.legend(fontsize=7); ax.set_ylim(0, 1.05); ax.grid(True, alpha=0.3)
+
+# Wavefront (top-right)
+ax = axes[0, 1]
+im = ax.imshow(np.array(wf_data['grids'][0]), cmap='RdBu_r', origin='lower')
+ax.set_title('Wavefront Map'); fig.colorbar(im, ax=ax, label='Waves')
+
+# Spot diagram (bottom-left)
+ax = axes[1, 0]
+fields = [s['field'] for s in spot_data['spots']]
+rms = [s['rms_spot_um'] for s in spot_data['spots']]
+geo = [s['geo_spot_um'] for s in spot_data['spots']]
+x = np.arange(len(fields))
+ax.bar(x - 0.35/2, rms, 0.35, label='RMS', color='steelblue')
+ax.bar(x + 0.35/2, geo, 0.35, label='GEO', color='darkorange')
+ax.set_xlabel('Field'); ax.set_ylabel('Spot Size (um)')
+ax.set_title('Spot Summary'); ax.set_xticks(x); ax.legend()
+
+axes[1, 1].axis('off')
+fig.suptitle('Optical Design Report', fontsize=14, y=1.02)
+fig.tight_layout()
+fig.savefig('full_report.png', dpi=200, bbox_inches='tight')
 ```
 
-## Common Plot Templates
-
-### MTF Plot (from extracted mtf_data)
+### Overlay Plots
 
 ```python
-# mtf_data comes from the analysis skill (FFT MTF → extract)
-colors = ('b', 'g', 'r', 'c', 'm', 'y', 'k')
-field_labels = ['0°', '14°', '20°']  # adjust to match actual fields
+import matplotlib.pyplot as plt
+import numpy as np
 
-plt.figure(figsize=(8, 6))
-for i, field_data in enumerate(mtf_data):
-    color = colors[i % len(colors)]
-    plt.plot(field_data['frequency'], field_data['tangential'],
-             color=color, label=f'{field_labels[i]} T')
-    plt.plot(field_data['frequency'], field_data['sagittal'],
-             '--', color=color, label=f'{field_labels[i]} S')
+with ZOSConnection() as zos:
+    TheNCE = zos.TheSystem.NCE
+    TheNCE.ClearDetectors()
+    TheNCE.TraceAll()
+    w, h, inc_data = zos.get_detector_data(2, data_type=0)
+    w, h, coh_data = zos.get_detector_data(2, data_type=1)
+    zos.close()
 
-plt.title('FFT MTF')
-plt.xlabel('Spatial Frequency (cycles/mm)')
-plt.ylabel('Modulus of the OTF')
-plt.grid(True)
-plt.legend()
-plt.savefig('mtf_plot.png', dpi=150)
+inc_np = np.array(inc_data)
+coh_np = np.array(coh_data)
+
+fig, ax = plt.subplots(figsize=(8, 6))
+ax.imshow(inc_np, cmap='gray', alpha=0.5, origin='lower',
+          extent=[-10, 10, -10, 10])
+levels = np.linspace(coh_np.min(), coh_np.max(), 10)
+cs = ax.contour(coh_np, levels=levels, cmap='plasma', origin='lower',
+                extent=[-10, 10, -10, 10], linewidths=0.8)
+ax.clabel(cs, inline=True, fontsize=8)
+ax.set_xlabel('X (mm)')
+ax.set_ylabel('Y (mm)')
+ax.set_title('Incoherent (gray) + Coherent Contours')
+fig.tight_layout()
+fig.savefig('overlay_analysis.png', dpi=150)
 ```
 
-### Spot Diagram (from batch ray trace data)
+## Figure Export Options
+
+| Format | Extension | Usage |
+|--------|-----------|-------|
+| PNG | .png | Web, reports, documentation |
+| PDF | .pdf | Vector graphics, publications, LaTeX |
+| SVG | .svg | Vector, editable in Illustrator/Inkscape |
+| EPS | .eps | LaTeX, publications |
 
 ```python
-# x_ary and y_ary come from the ray-tracing skill (batch ray trace results)
-# Shape: x_ary[num_fields, num_wavelengths, num_rays]
-num_fields = x_ary.shape[0]
-num_wavelengths = x_ary.shape[1]
-
-plt.figure(figsize=(12, 4))
-colors = ('b', 'g', 'r', 'c', 'm', 'y', 'k')
-
-for field in range(num_fields):
-    plt.subplot(1, num_fields, field + 1, aspect='equal')
-    plt.title(f'Field {field + 1}')
-
-    for wave in range(num_wavelengths):
-        x = x_ary[field, wave, :]
-        y = y_ary[field, wave, :]
-        # Filter out zero entries (missed rays)
-        mask = (x != 0) | (y != 0)
-        plt.plot(x[mask], y[mask], '.', ms=1, color=colors[wave % len(colors)])
-
-plt.suptitle('Spot Diagram')
-plt.subplots_adjust(wspace=0.8)
-plt.savefig('spot_diagram.png', dpi=150)
+# Export a figure in multiple formats
+fig.savefig('plot.png', dpi=300, bbox_inches='tight')
+fig.savefig('plot.pdf', bbox_inches='tight')
+fig.savefig('plot.svg', bbox_inches='tight')
 ```
 
-### NSC Detector Heatmap
+### Export Directory
 
 ```python
-# detector_data, x_half_width, y_half_width come from the
-# non-sequential-modeling skill (detector property readout)
-
-plt.figure(figsize=(8, 6))
-plt.imshow(detector_data, extent=[
-    -x_half_width, x_half_width,
-    -y_half_width, y_half_width
-])
-plt.colorbar(label='Irradiance')
-plt.title('NSC Detector Data')
-plt.xlabel('X position (mm)')
-plt.ylabel('Y position (mm)')
-plt.savefig('detector_heatmap.png', dpi=150)
+output_dir = os.path.join(zos.ensure_zmx_dir(), 'figures')
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+fig.savefig(os.path.join(output_dir, 'mtf.png'), dpi=200)
 ```
 
-### RMS Spot Size Bar Chart
+## Style Customization
+
+Apply consistent styling globally:
 
 ```python
-# spot_results comes from the analysis skill (StandardSpot analysis)
-num_fields = spot_results.SpotData.NumberOfFields
-
-rms_values = [spot_results.SpotData.GetRMSSpotSizeFor(f, 1) for f in range(1, num_fields + 1)]
-geo_values = [spot_results.SpotData.GetGeoSpotSizeFor(f, 1) for f in range(1, num_fields + 1)]
-
-x = np.arange(num_fields)
-width = 0.35
-
-plt.figure(figsize=(8, 5))
-plt.bar(x - width/2, rms_values, width, label='RMS')
-plt.bar(x + width/2, geo_values, width, label='GEO')
-plt.xlabel('Field')
-plt.ylabel('Spot Radius (µm)')
-plt.title('Spot Size by Field')
-plt.xticks(x, [f'Field {f+1}' for f in range(num_fields)])
-plt.legend()
-plt.grid(axis='y')
-plt.savefig('spot_sizes.png', dpi=150)
+import matplotlib.pyplot as plt
+plt.rcParams.update({'figure.dpi': 150, 'font.size': 11,
+    'axes.labelsize': 12, 'axes.titlesize': 13,
+    'legend.fontsize': 9, 'lines.linewidth': 1.5})
 ```
 
-## Exporting Data
+## Plot Function Quick Reference
 
-### To CSV
-
-```python
-import csv
-
-with open('analysis_results.csv', 'w', newline='') as f:
-    writer = csv.writer(f)
-    writer.writerow(['Field', 'RMS_Spot_Radius', 'GEO_Spot_Radius'])
-    for field in range(1, num_fields + 1):
-        rms = spot_results.SpotData.GetRMSSpotSizeFor(field, 1)
-        geo = spot_results.SpotData.GetGeoSpotSizeFor(field, 1)
-        writer.writerow([field, rms, geo])
-```
-
-### To NumPy Array
-
-```python
-# Convert detector data to numpy for advanced processing
-detector_array = np.array(detector_data)
-
-# Compute statistics
-total_power = np.sum(detector_array)
-peak_irradiance = np.max(detector_array)
-centroid_x = np.sum(np.sum(detector_array, axis=0) * np.arange(detector_array.shape[1]))
-centroid_y = np.sum(np.sum(detector_array, axis=1) * np.arange(detector_array.shape[0]))
-print(f"Total power: {total_power:.2e}")
-print(f"Peak irradiance: {peak_irradiance:.2e}")
-```
-
-## Report Generation Template
-
-```python
-def generate_report(filename, spot_data, mtf_data):
-    """Generate a text performance report from pre-extracted data.
-
-    Args:
-        filename: Output report path (.txt or .md)
-        spot_data: dict with 'rms' and 'geo' lists keyed by field number
-        mtf_data: list of dicts with 'frequency', 'tangential', 'sagittal' keys
-    """
-    with open(filename, 'w') as f:
-        f.write("=" * 60 + "\n")
-        f.write("OPTICAL PERFORMANCE REPORT\n")
-        f.write("=" * 60 + "\n\n")
-
-        f.write("--- Spot Sizes ---\n")
-        f.write(f"{'Field':<10} {'RMS (µm)':<12} {'GEO (µm)':<12}\n")
-        f.write("-" * 34 + "\n")
-        for field_num in sorted(spot_data.keys()):
-            rms, geo = spot_data[field_num]
-            f.write(f"{field_num:<10} {rms:<12.3f} {geo:<12.3f}\n")
-
-        f.write("\n--- MTF Summary ---\n")
-        for i, field_data in enumerate(mtf_data):
-            t0 = field_data['tangential'][0]
-            s0 = field_data['sagittal'][0]
-            f.write(f"Field {i+1}: T={t0:.4f}, S={s0:.4f} "
-                    f"(at low freq)\n")
-
-    print(f"Report saved: {filename}")
-```
+| Function | Source Data | Use Case |
+|----------|-------------|----------|
+| `plot_mtf()` | `zos.extract_mtf_data()` | MTF curves |
+| `plot_spot_diagram()` | `zos.extract_spot_data()` | RMS/GEO bar chart |
+| `plot_wavefront_map()` | `zos.extract_wavefront_data()` | 2D wavefront heatmap |
+| `plot_ray_fan()` | `zos.extract_ray_fan_data()` | Aberration curves |
+| `plot_detector_data()` | `zos.get_detector_data()` | NSC detector image |
+| `plot_tolerance_cdf()` | `zos.run_tolerance_monte_carlo()` | Yield CDF curve |
 
 ## Notes
 
-- Always call `plt.show()` AFTER closing the ZOS connection
-- Use `plt.savefig()` instead of `plt.show()` for non-interactive report generation
-- For large detector arrays, use numpy vectorized operations instead of Python loops
-- Set figure DPI for publication-quality output: `plt.figure(dpi=150)`
-- Multi-page reports can use `matplotlib.backends.backend_pdf.PdfPages`
+- **CRITICAL: Close ZOS connection before `plt.show()`** — either call
+  `zos.close()` or place plotting code outside the `with ZOSConnection():`
+  block. Matplotlib displaying a window while .NET is active will crash
+  or hang. Use `plt.savefig()` for non-interactive scripts.
+- All plot functions accept `save_path` (str), `show` (bool), and
+  return `(fig, ax)` for further customization.
+- `fig.tight_layout()` and `bbox_inches='tight'` prevent clipped labels.
+- Default DPI is 150; use 300+ for publication-quality output.
+- `x_extent`/`y_extent` in `plot_detector_data()` set axis range in mm.
+- Colormaps: `'hot'`/`'inferno'` for irradiance, `'RdBu_r'` for
+  phase/wavefront, `'viridis'`/`'plasma'` for general data.
+- SVG/PDF preserve vector art; PNG for web use.
