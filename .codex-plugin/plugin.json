@@ -1,0 +1,41 @@
+{
+  "name": "AutoZemax",
+  "version": "0.2.0",
+  "description": "Zemax OpticStudio automation plugin — complete optical design workflow: modeling, simulation, optimization, tolerance analysis, NSC modeling, CAD exchange, and data visualization via ZOS-API. Covers all 26 official ZOS-API sample patterns.",
+  "author": {
+    "name": "Lex669",
+    "email": "Lexy2216@outlook.com"
+  },
+  "homepage": "https://github.com/Lex669/AutoZemax",
+  "repository": "https://github.com/Lex669/AutoZemax",
+  "license": "MIT",
+  "keywords": [
+    "zemax",
+    "optics",
+    "lens-design",
+    "simulation",
+    "zos-api",
+    "opticstudio",
+    "sequential",
+    "non-sequential",
+    "nsc",
+    "optimization",
+    "tolerance",
+    "cad",
+    "mtf",
+    "spot-diagram"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "AutoZemax",
+    "shortDescription": "Zemax OpticStudio automation via ZOS-API — optical design, simulation, optimization, tolerance analysis and NSC workflows.",
+    "developerName": "Lex669",
+    "category": "Design",
+    "capabilities": [],
+    "defaultPrompt": [
+      "帮我搭建一个双胶合消色差透镜系统",
+      "对当前镜头做 MTF 分析并给出成像质量评估",
+      "运行公差分析并生成蒙特卡洛报告"
+    ]
+  }
+}
