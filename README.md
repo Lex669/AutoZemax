@@ -8,7 +8,11 @@ AutoZemax 将 Zemax OpticStudio 的 ZOS-API 与 Claude Code 集成，使光学�
 
 v0.2.0 是一次完整的重构，围绕 26 个官方 ZOS-API 示例模式进行组织，并采用基于库的架构以最大程度减少样板代码。
 
+同时适配 **Claude Code 与 Codex CLI 双插件生态**（`.claude-plugin/plugin.json` + `.codex-plugin/plugin.json`）。
+
 ## 安装
+
+### Claude Code
 
 ```bash
 # Claude Code 插件市场安装
@@ -16,8 +20,17 @@ v0.2.0 是一次完整的重构，围绕 26 个官方 ZOS-API 示例模式进行
 /plugin install AutoZemax@AutoSim
 ```
 
+### Codex CLI（v0.121+）
 
+```bash
+# 注册 AutoSim 插件市场
+codex plugin marketplace add Lex669/AutoSim
+# 安装插件（autosim 为清单注册名，可用 codex plugin marketplace list 查看）
+codex plugin add AutoZemax@autosim
+```
 
+> [!NOTE]
+> Codex 端注册 `skills/` 下的 11 个技能，通过自然语言描述建模/仿真/优化任务即可自动调用；斜杠命令 `/autozemax:*` 与自主代理（model-validator 等）仅在 Claude Code 端可用。
 
 
 ## 架构
@@ -103,8 +116,10 @@ v0.2.0 是一次完整的重构，围绕 26 个官方 ZOS-API 示例模式进行
 ```
 AutoZemax/
 ├── .claude-plugin/
-│   └── plugin.json              # 插件清单
-├── commands/                     # 4 个斜杠命令
+│   └── plugin.json              # Claude Code 插件清单
+├── .codex-plugin/
+│   └── plugin.json              # Codex 插件清单
+├── commands/                     # 4 个斜杠命令（仅 Claude Code）
 │   ├── model.md                 # 阶段 1：创建/编辑系统
 │   ├── simulate.md              # 阶段 2：运行分析和优化
 │   ├── analyze.md               # 阶段 3：绘制结果并导出
