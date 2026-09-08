@@ -184,6 +184,36 @@ AutoZemax/
 - 库封装函数参考
 - 数据提取模式
 
+## 更新日志
+
+### v0.2.0 · 2026-09-07 — Codex CLI 适配
+
+- 新增 `.codex-plugin/plugin.json`，插件同时支持 **Claude Code 与 Codex CLI（v0.121+）** 双生态；Codex 端注册 `skills/` 下的 11 个技能。
+- README 增加 Codex CLI 安装指引（`codex plugin marketplace add Lex669/AutoSim` → `codex plugin add AutoZemax@autosim`）。
+- 明确两端能力差异：斜杠命令 `/autozemax:*` 与 3 个自主代理仅在 Claude Code 端可用。
+
+### v0.2.0 · 2026-06-23 — 完整重构
+
+- 围绕 26 个官方 ZOS-API 示例重新组织技能体系，技能数量 9 → 11：
+  - 新增/拆分：`sequential-analysis`、`nsc-modeling`、`nsc-analysis`、`nsc-scattering`、`multi-configuration`、`cad-exchange`
+  - 移除：`analysis`、`ray-tracing`、`cad-export`、`non-sequential-modeling`（能力已并入上述新技能）
+- `scripts/zos_utils.py` 由 276 行扩充至 1650+ 行，采用基于库的架构，统一连接管理、分析数据提取、优化/公差运行器、多重结构、CAD 导入导出与图表生成接口。
+- 命令层定型为 4 个入口：`process.md` 更名为 `analyze.md`，`model` / `simulate` / `pipeline` 全面改写。
+- 3 个代理（`model-validator`、`result-analyzer`、`script-debugger`）全部重写，明确触发条件与职责边界。
+- 引入 `ZOS-API Samples/`（26 个官方示例）与 `PythonStandaloneApplication/`（ZOS-API 框架样板）作为参考实现。
+- 参考资料调整：移除 `python-examples.md`，重写 `environment.md` 与 `zos-api-reference.md`。
+- `.claude-plugin/plugin.json` 补全 `keywords`、`homepage`、`repository` 等元数据。
+
+### v0.1.x · 2026-06-16 — 缺陷修复
+
+- 修复若干 bug：`zos_utils.py` 接口健壮性、非序列建模技能、`script-debugger` 代理与 ZOS-API 参考文档。
+
+### v0.1.0 · 2026-06-15 — 首个版本
+
+- 插件首次成型：`.claude-plugin/plugin.json`、4 个斜杠命令（`model` / `simulate` / `process` / `pipeline`）、9 个技能、3 个自主代理。
+- `scripts/zos_utils.py` 初版（276 行）；参考资料 `environment.md`、`zos-api-reference.md`、`python-examples.md`。
+- 仓库创建，采用 MIT 许可证。
+
 ## 许可证
 
 MIT
