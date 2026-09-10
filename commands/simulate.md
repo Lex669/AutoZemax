@@ -55,35 +55,7 @@ Before running simulations, verify:
 
 ## Python Script Template
 
-Every generated script must use the compact import with `set_seed(42)`:
-
-```python
-import sys, os
-_PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
-for _p in [
-    os.path.join(_PLUGIN_ROOT, 'scripts') if _PLUGIN_ROOT else '',
-    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.2.0\scripts',
-    r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
-]:
-    if _p and os.path.isdir(_p):
-        sys.path.insert(0, _p); break
-from zos_utils import ZOSConnection, set_seed
-set_seed(42)
-
-with ZOSConnection() as zos:
-    # ... skill-specific simulation code ...
-    # Extract data before closing connection
-
-# Plot outside the ZOSConnection context
-import matplotlib.pyplot as plt
-plt.plot(x_data, y_data)
-plt.show()
-```
-
-Execute with:
-```
-& "C:\Users\Lex\AppData\Local\Python\pythoncore-3.14-64\python.exe" <script>.py
-```
+统一使用 `references/environment.md` 的标准导入模板（`set_seed(42)` + `ZOSConnection` 上下文管理器）和执行命令；具体脚本结构以对应 skill 为准。
 
 ## Result Analysis
 

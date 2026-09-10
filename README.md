@@ -30,7 +30,7 @@ codex plugin add AutoZemax@autosim
 ```
 
 > [!NOTE]
-> Codex 端注册 `skills/` 下的 11 个技能，通过自然语言描述建模/仿真/优化任务即可自动调用；斜杠命令 `/autozemax:*` 与自主代理（model-validator 等）仅在 Claude Code 端可用。
+> Codex 端会注册 `skills/` 下的 11 个技能，并在安装时把 `commands/` 下的 4 个斜杠命令迁移为 skills（`source-command-*`）。注意：单个命令迁移后若超过 4 KB 会被 Codex 静默跳过，因此命令文件需保持精简。
 
 
 ## 架构
@@ -119,7 +119,7 @@ AutoZemax/
 │   └── plugin.json              # Claude Code 插件清单
 ├── .codex-plugin/
 │   └── plugin.json              # Codex 插件清单
-├── commands/                     # 4 个斜杠命令（仅 Claude Code）
+├── commands/                     # 4 个斜杠命令（Claude Code 使用，Codex 安装时迁移为 skills）
 │   ├── model.md                 # 阶段 1：创建/编辑系统
 │   ├── simulate.md              # 阶段 2：运行分析和优化
 │   ├── analyze.md               # 阶段 3：绘制结果并导出
