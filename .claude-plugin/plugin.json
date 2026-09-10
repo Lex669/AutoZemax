@@ -1,6 +1,6 @@
 {
   "name": "autozemax",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Zemax OpticStudio automation plugin — complete optical design workflow: modeling, simulation, optimization, tolerance analysis, NSC modeling, CAD exchange, and data visualization via ZOS-API. Covers all 26 official ZOS-API sample patterns.",
   "author": {
     "name": "xiaoxin_robotech"
