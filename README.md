@@ -1,4 +1,4 @@
-# AutoZemax — Zemax OpticStudio 自动化插件 (v0.2.0)
+# AutoZemax — Zemax OpticStudio 自动化插件 (v0.2.1)
 
 通过 Claude Code 中的自然语言，自动化完整的 Zemax 光学设计工作流——从建模到仿真再到数据处理。
 
@@ -6,7 +6,7 @@
 
 AutoZemax 将 Zemax OpticStudio 的 ZOS-API 与 Claude Code 集成，使光学工程师能够通过对话式命令创建、仿真、优化和分析镜头系统。每个功能都被封装为一个技能（skill），Claude 会自动加载。
 
-v0.2.0 是一次完整的重构，围绕 26 个官方 ZOS-API 示例模式进行组织，并采用基于库的架构以最大程度减少样板代码。
+v0.2.x 版本围绕 26 个官方 ZOS-API 示例模式进行组织，并采用基于库的架构以最大程度减少样板代码。
 
 同时适配 **Claude Code 与 Codex CLI 双插件生态**（`.claude-plugin/plugin.json` + `.codex-plugin/plugin.json`）。
 
@@ -185,6 +185,13 @@ AutoZemax/
 - 数据提取模式
 
 ## 更新日志
+
+### v0.2.1 · 2026-09-10 — Codex 命令迁移修复
+
+- 精简 `simulate.md` 与 `pipeline.md`，使 4 个斜杠命令迁移后均低于 Codex 的 4 KB 限制，安装后 `source-command-*` 全部生成。
+- 命令文件移除内嵌的 Python 导入模板，统一指向 `references/environment.md`，减少与 skills 的重复。
+- 更正 README 说明：Codex 安装时会把 `commands/` 迁移为 skills，不再写“斜杠命令仅 Claude Code 可用”。
+- 版本号 0.2.0 → 0.2.1。
 
 ### v0.2.0 · 2026-09-07 — Codex CLI 适配
 
