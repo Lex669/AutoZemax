@@ -13,10 +13,28 @@ Usage:
 
     set_seed(42)  # reproducible ray traces
 
-    with ZOSConnection() as zos:
+    with ZOSConnection() as zos:              # standalone (default, headless)
         zos.validate_system_ready()          # pre-flight check
         zos.set_nsc_orientation(obj, 0, 45, 0)  # safe: uses TiltAboutX/Y/Z
         # ... your automation code ...
+
+Connection modes:
+    standalone   Hidden OpticStudio instance launched by the API. Fast, no UI,
+                 supports parallel runs. Used for batch optimization, tolerance
+                 Monte Carlo and unattended pipelines.
+    interactive  Attaches to an OpticStudio GUI session whose "Interactive
+                 Extension" is waiting for a connection (Programming tab ->
+                 Interactive Extension). Live-visible edits, reuses the user's
+                 open design. Single instance, slower because the UI syncs.
+    auto         Reuse a waiting interactive session when one exists,
+                 otherwise fall back to standalone.
+
+    Selection order: explicit ``mode=`` argument -> ``AUTOZEMAX_MODE``
+    environment variable -> ``standalone`` (unchanged legacy behaviour).
+
+    >>> with ZOSConnection(mode="interactive") as zos:
+    ...     zos.save_interactive_copy()    # edit a copy, never the user's file
+    ...     zos.validate_system_ready()
 
 Environment:
     Python: C:\\Users\\Lex\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe
@@ -30,6 +48,62 @@ import math
 import random
 import winreg
 from itertools import islice
+
+# ------------------------------------------------------------------
+# Connection modes
+# ------------------------------------------------------------------
+
+MODE_STANDALONE = "standalone"   # headless instance created by the API
+MODE_INTERACTIVE = "interactive" # attach to the GUI "Interactive Extension"
+MODE_AUTO = "auto"               # reuse a waiting extension, else standalone
+
+VALID_MODES = (MODE_STANDALONE, MODE_INTERACTIVE, MODE_AUTO)
+
+#: Environment variable that overrides the default mode of ZOSConnection.
+#: Values: "standalone", "interactive", "auto".
+MODE_ENV_VAR = "AUTOZEMAX_MODE"
+
+#: Highest extension instance number probed by mode="interactive"/"auto".
+DEFAULT_MAX_INSTANCES = 8
+
+#: Per-attempt connection timeout used while probing extension instances.
+#: Wrong instance numbers return immediately, so this only bounds pathological
+#: hangs (observed real-world probe cost: < 0.1 s per instance).
+PROBE_TIMEOUT_SEC = 2.0
+
+
+def resolve_mode(mode=None):
+    """Resolve the effective connection mode.
+
+    Priority: explicit ``mode`` argument -> ``AUTOZEMAX_MODE`` env var ->
+    ``standalone``.
+
+    Args:
+        mode: "standalone", "interactive", "auto" or None.
+
+    Returns:
+        One of "standalone", "interactive", "auto".
+
+    Raises:
+        ValueError: If the value is not a recognised mode.
+    """
+    if mode is None:
+        env = os.environ.get(MODE_ENV_VAR)
+        if env:
+            env = env.strip().lower()
+            if env in VALID_MODES:
+                return env
+            print(f"WARNING: ignoring invalid {MODE_ENV_VAR}='{env}'. "
+                  f"Valid values: {', '.join(VALID_MODES)}.")
+        return MODE_STANDALONE
+
+    mode = str(mode).strip().lower()
+    if mode not in VALID_MODES:
+        raise ValueError(
+            f"Unknown connection mode '{mode}'. "
+            f"Valid values: {', '.join(VALID_MODES)}."
+        )
+    return mode
 
 # ------------------------------------------------------------------
 # Deterministic random seed — call set_seed() once at script start
@@ -145,34 +219,89 @@ class ZOSConnection:
         """Raised when a trap property name (e.g. TiltX) is used."""
         pass
 
-    def __init__(self, zos_path=None):
+    class InteractiveNotAvailable(ConnectionException):
+        """Raised when no OpticStudio Interactive Extension session is waiting.
+
+        Fix: launch OpticStudio, then click Programming -> Interactive
+        Extension (ZOS API.NET Applications group). The extension window must
+        show "Waiting for connection...". See the `interactive-session` skill.
+        """
+        pass
+
+    def __init__(self, zos_path=None, mode=None, instance=None,
+                 show_changes_in_ui=None, timeout_sec=10.0,
+                 max_instances=DEFAULT_MAX_INSTANCES):
         """Initialize ZOS-API connection.
 
         Args:
             zos_path: Optional custom path to OpticStudio installation.
                       If None, auto-detects from Windows registry.
+            mode: "standalone" (default), "interactive" or "auto".
+                  None -> AUTOZEMAX_MODE env var -> "standalone".
+            instance: Extension instance number to attach to (interactive
+                      mode). None probes 1..max_instances and uses the first
+                      instance that accepts the connection.
+            show_changes_in_ui: interactive mode only. True (default) makes
+                      the GUI reflect every change live; False speeds up bulk
+                      edits. Ignored in standalone mode.
+            timeout_sec: Connection timeout in seconds for the final attempt.
+            max_instances: Highest extension instance number probed.
         """
         self.TheConnection = None
         self.TheApplication = None
         self.TheSystem = None
         self.ZOSAPI = None
         self._zos_path = zos_path
+        self._requested_mode = resolve_mode(mode)
+        self._instance = None if instance is None else int(instance)
+        self._show_changes_in_ui = show_changes_in_ui
+        self._timeout_sec = float(timeout_sec)
+        self._max_instances = int(max_instances)
+        self._mode = None          # actual mode after connect()
         # System type exports (populated in connect())
         self.Int32 = None
         self.Double = None
         self.Enum = None
 
     # ------------------------------------------------------------------
+    # Mode introspection
+    # ------------------------------------------------------------------
+
+    @property
+    def mode(self):
+        """Mode actually in use: "standalone", "interactive", or None."""
+        return self._mode
+
+    @property
+    def is_interactive(self):
+        """True when attached to a running OpticStudio GUI session."""
+        return self._mode == MODE_INTERACTIVE
+
+    @property
+    def instance(self):
+        """Extension instance number in use, or None."""
+        return self._instance if self.is_interactive else None
+
+    def mode_banner(self):
+        """One-line summary of the active connection mode (for logs)."""
+        if self._mode is None:
+            return "[AutoZemax] not connected"
+        if self._mode == MODE_INTERACTIVE:
+            return (f"[AutoZemax] connected / interactive mode "
+                    f"(instance {self._instance}, live UI updates: "
+                    f"{self._ui_updates_enabled()})")
+        return "[AutoZemax] connected / standalone mode (headless instance)"
+
+    # ------------------------------------------------------------------
     # Connection lifecycle
     # ------------------------------------------------------------------
 
-    def connect(self):
-        """Establish the full ZOS-API connection stack.
+    def _load_api(self):
+        """Load ZOS-API assemblies and export System types.
 
-        Exports System types (Int32, Double, Enum) as instance attributes
-        for use in batch ray traces and other .NET interop.
-
-        Returns self for chaining.
+        Shared by every mode: locates ZOSAPI_NetHelper.dll through the registry,
+        initializes the ZOS-API, adds the assembly references and exposes the
+        .NET types (Int32, Double, Enum) used by batch ray traces.
         """
         # Locate ZOSAPI_NetHelper.dll via registry
         aKey = None
@@ -218,19 +347,100 @@ class ZOSConnection:
         self.Int32 = Int32
         self.Double = Double
 
-        # Create connection and application
-        self.TheConnection = ZOSAPI.ZOSAPI_Connection()
-        if self.TheConnection is None:
+    def _new_connection(self):
+        """Create a fresh ZOSAPI_Connection object (one per attempt)."""
+        conn = self.ZOSAPI.ZOSAPI_Connection()
+        if conn is None:
             raise ZOSConnection.ConnectionException(
                 "Unable to initialize .NET connection to ZOSAPI"
             )
+        try:
+            conn.ConnectionTimeoutSeconds = self._timeout_sec
+        except Exception:
+            pass  # property is optional across versions
+        return conn
 
+    def _open_standalone(self):
+        """Launch a new headless OpticStudio instance."""
+        self.TheConnection = self._new_connection()
         self.TheApplication = self.TheConnection.CreateNewApplication()
         if self.TheApplication is None:
             raise ZOSConnection.InitializationException(
                 "Unable to acquire ZOSAPI application"
             )
+        self._mode = MODE_STANDALONE
 
+    def _probe_one_instance(self, number):
+        """Try to attach to extension instance ``number``.
+
+        Returns the IZOSAPI_Application on success, else None. Wrong instance
+        numbers fail fast (measured < 0.1 s) instead of raising.
+
+        Note: when nothing is listening, ConnectAsExtension() still returns a
+        non-None stub (Mode=Server, IsValidLicenseForAPI=False,
+        InitializationErrorCode=NotFound, PrimarySystem=None). Only a real
+        extension session reports Mode=Plugin, so that is the acceptance test.
+        """
+        conn = None
+        try:
+            conn = self.ZOSAPI.ZOSAPI_Connection()
+            if conn is None:
+                return None
+            try:
+                conn.ConnectionTimeoutSeconds = min(
+                    self._timeout_sec, PROBE_TIMEOUT_SEC
+                )
+            except Exception:
+                pass
+            app = conn.ConnectAsExtension(int(number))
+        except Exception:
+            return None
+        if app is None:
+            return None
+
+        if not self._is_extension_app(app):
+            return None
+
+        try:
+            conn.ConnectionTimeoutSeconds = self._timeout_sec
+        except Exception:
+            pass
+        self.TheConnection = conn
+        return app
+
+    def _is_extension_app(self, app):
+        """True when ``app`` is a genuine Interactive Extension session.
+
+        OpticStudio reports ZOSAPI_Mode.Plugin for extension connections; the
+        not-listening stub reports ZOSAPI_Mode.Server (same as standalone) plus
+        InitializationErrorCode=NotFound.
+        """
+        try:
+            return app.Mode == self.ZOSAPI.ZOSAPI_Mode.Plugin
+        except Exception:
+            pass
+        return str(getattr(app, "Mode", "")) == "Plugin"
+
+    def _open_interactive(self):
+        """Attach to a waiting Interactive Extension session.
+
+        Returns True on success. Never closes the user's OpticStudio.
+        """
+        candidates = ([self._instance] if self._instance is not None
+                      else range(1, self._max_instances + 1))
+        for number in candidates:
+            app = self._probe_one_instance(number)
+            if app is not None:
+                self.TheApplication = app
+                self._mode = MODE_INTERACTIVE
+                self._instance = int(number)
+                if self._show_changes_in_ui is not None:
+                    self.set_ui_updates(bool(self._show_changes_in_ui))
+                return True
+        return False
+
+    def _require_ready(self):
+        """Validate license and PrimarySystem for the connected application."""
         if not self.TheApplication.IsValidLicenseForAPI:
             raise ZOSConnection.LicenseException(
                 "License is not valid for ZOSAPI use"
@@ -238,23 +448,155 @@ class ZOSConnection:
 
         self.TheSystem = self.TheApplication.PrimarySystem
         if self.TheSystem is None:
+            if self.is_interactive:
+                raise ZOSConnection.SystemNotPresentException(
+                    "The OpticStudio session has no open system (PrimarySystem "
+                    "is None). Open or create a file in OpticStudio, then "
+                    "re-run — the Interactive Extension dialog must be "
+                    "clicked again after each disconnect."
+                )
             raise ZOSConnection.SystemNotPresentException(
                 "Unable to acquire Primary system"
             )
 
+    def connect(self):
+        """Establish the ZOS-API connection stack in the requested mode.
+
+        Exports System types (Int32, Double, Enum) as instance attributes
+        for use in batch ray traces and other .NET interop.
+
+        Returns self for chaining.
+
+        Raises:
+            InteractiveNotAvailable: mode="interactive" but no OpticStudio
+                instance had its Interactive Extension waiting.
+        """
+        self._load_api()
+
+        if self._requested_mode == MODE_INTERACTIVE:
+            if not self._open_interactive():
+                probed = (str(self._instance) if self._instance is not None
+                          else f"1-{self._max_instances}")
+                raise ZOSConnection.InteractiveNotAvailable(
+                    "No OpticStudio Interactive Extension session is waiting "
+                    f"(probed instance(s) {probed}).\n"
+                    "  Fix: open OpticStudio, then click Programming -> "
+                    "Interactive Extension so the dialog shows "
+                    "'Waiting for connection...'.\n"
+                    "  Or run the same task with mode='standalone' / "
+                    "AUTOZEMAX_MODE=standalone."
+                )
+        elif self._requested_mode == MODE_AUTO:
+            if not self._open_interactive():
+                self._open_standalone()
+        else:
+            self._open_standalone()
+
+        self._require_ready()
+        print(self.mode_banner())
         return self
 
     def close(self):
-        """Close the OpticStudio application and release resources."""
+        """Release resources, closing OpticStudio only in standalone mode.
+
+        Interactive mode NEVER calls CloseApplication() — the running
+        OpticStudio belongs to the user; disconnecting simply ends the
+        extension session (the Interactive Extension dialog closes itself).
+        """
         if self.TheApplication is not None:
-            self.TheApplication.CloseApplication()
-            self.TheApplication = None
+            if self.is_interactive:
+                self.TheApplication = None
+            else:
+                try:
+                    self.TheApplication.CloseApplication()
+                except Exception as exc:  # keep __del__ / __exit__ safe
+                    print(f"WARNING: CloseApplication failed: {exc}")
+                finally:
+                    self.TheApplication = None
         self.TheConnection = None
         self.TheSystem = None
         self.ZOSAPI = None
         self.Int32 = None
         self.Double = None
         self.Enum = None
+
+    # ------------------------------------------------------------------
+    # Interactive-mode helpers
+    # ------------------------------------------------------------------
+
+    def _ui_updates_enabled(self):
+        """True when the GUI is currently mirroring API changes."""
+        if self.TheApplication is None:
+            return False
+        try:
+            return bool(self.TheApplication.ShowChangesInUI)
+        except Exception:
+            return False
+
+    def set_ui_updates(self, enabled=True):
+        """Turn live GUI updates on/off (interactive mode only).
+
+        Interactive mode mirrors every change into the OpticStudio window when
+        enabled, which is what makes the work visible — and also what makes
+        bulk edits slower. Standalone mode is a no-op.
+
+        Args:
+            enabled: True to show changes live, False to batch silently.
+
+        Returns:
+            True if the setting was applied, False when not applicable.
+        """
+        if self.TheApplication is None:
+            raise ZOSConnection.ConnectionException(
+                "Not connected — call connect() before set_ui_updates()"
+            )
+        if not self.is_interactive:
+            return False
+        self.TheApplication.ShowChangesInUI = bool(enabled)
+        return True
+
+    def save_interactive_copy(self, path=None, suffix="_interactive"):
+        """Save the live system to a working copy and keep editing the copy.
+
+        Interactive mode operates on whatever the user has open, so AutoZemax
+        saves a copy under zmx/ first: SaveAs repoints the OpticStudio window at
+        the copy, leaving the user's original file untouched on disk.
+
+        Standalone mode is a no-op (the system is already a scratch instance).
+
+        Args:
+            path: Explicit destination. Defaults to
+                  zmx/<original stem><suffix>.zos.
+            suffix: Appended to the original file stem when path is None.
+
+        Returns:
+            The path being edited (the copy in interactive mode, the current
+            SystemFile in standalone mode).
+        """
+        if self.TheSystem is None:
+            raise ZOSConnection.SystemNotPresentException(
+                "Unable to acquire Primary system"
+            )
+
+        current = self.TheSystem.SystemFile
+
+        if not self.is_interactive:
+            print(f"[AutoZemax] save_interactive_copy() is a no-op in "
+                  f"standalone mode (system: {current})")
+            return current
+
+        if path is None:
+            stem = os.path.splitext(os.path.basename(current or "system"))[0]
+            path = os.path.join(ensure_zmx_dir(), f"{stem}{suffix}.zos")
+
+        parent = os.path.dirname(os.path.abspath(path))
+        if parent and not os.path.exists(parent):
+            os.makedirs(parent)
+
+        self.TheSystem.SaveAs(path)
+        print(f"[AutoZemax] interactive working copy: {path}")
+        print(f"[AutoZemax] original file untouched: {current}")
+        return path
 
     # ------------------------------------------------------------------
     # Context manager support
@@ -827,11 +1169,17 @@ class ZOSConnection:
         for field in range(1, n_fields + 1):
             rms = spot_data.GetRMSSpotSizeFor(field, 1)
             geo = spot_data.GetGeoSpotSizeFor(field, 1)
+            # GetAiryRadiusFor() is not exposed by every OpticStudio build
+            # (missing in 2025 R2 / v252), so probe it instead of assuming.
+            try:
+                airy = spot_data.GetAiryRadiusFor(field, 1)
+            except Exception:
+                airy = 0.0
             spots.append({
                 'field': field,
                 'rms_spot_um': rms,
                 'geo_spot_um': geo,
-                'airy_radius_um': spot_data.GetAiryRadiusFor(field, 1) if n_fields > 0 else 0,
+                'airy_radius_um': airy,
             })
         return {'spots': spots, 'n_fields': n_fields}
 
