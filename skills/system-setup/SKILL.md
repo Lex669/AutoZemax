@@ -1,7 +1,7 @@
 ---
 name: system-setup
 description: This skill should be used when the user asks to "create new file", "load zmx file", "open zemax file", "set aperture", "set field", "add wavelength", "configure system explorer", "select wavelength preset", "add material catalog", "check license", "verify zemax", "connect to zemax", "new optical system", "import system", "system preferences", "get zemax version", or initializes and configures a new or existing Zemax optical system.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # System Setup — New Files, Loading, System Explorer
@@ -18,7 +18,8 @@ import sys, os
 _PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
 for _p in [
     os.path.join(_PLUGIN_ROOT, 'scripts') if _PLUGIN_ROOT else '',
-    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.2.0\scripts',
+    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
+    r'C:\Users\Lex\.codex\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
     r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
 ]:
     if _p and os.path.isdir(_p):
@@ -32,6 +33,16 @@ Execute with:
 ```
 & "C:\Users\Lex\AppData\Local\Python\pythoncore-3.14-64\python.exe" <script>.py
 ```
+
+### Connection mode (standalone vs interactive)
+
+`ZOSConnection()` defaults to `standalone` (hidden instance, fastest). Pass
+`ZOSConnection(mode="interactive")` to drive the OpticStudio GUI that is
+already open — the user sees every change live, but a session must be armed
+first via **Programming → Interactive Extension**, and the original file must
+be protected with `zos.save_interactive_copy()`. `mode="auto"` reuses a waiting
+interactive session when one exists. See the `interactive-session` skill for
+the bootstrap recipe and the fallback rules.
 
 ## Creating New Systems
 

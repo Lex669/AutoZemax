@@ -1,4 +1,4 @@
-# ZOS-API Quick Reference (v0.2.0)
+# ZOS-API Quick Reference (v0.3.0)
 
 Key classes and methods from the Zemax OpticStudio API (v252).
 For library wrappers, see `scripts/zos_utils.py`.
@@ -6,14 +6,34 @@ For library wrappers, see `scripts/zos_utils.py`.
 ## Connection & Application
 
 ```python
-# Connection setup (handled by zos_utils.ZOSConnection)
+# Standalone: API launches its own hidden instance (Mode == Server)
 TheConnection = ZOSAPI.ZOSAPI_Connection()
 TheApplication = TheConnection.CreateNewApplication()
 TheSystem = TheApplication.PrimarySystem
+
+# Interactive: attach to the running GUI whose Interactive Extension is armed
+# (Dialog: Programming -> Interactive Extension -> "Waiting for connection...")
+TheApplication = TheConnection.ConnectAsExtension(instanceNumber)  # Mode == Plugin
 ```
+
+### Connection rules (verified on 2025 R2 / v252)
+
+| Call | Works for | Notes |
+|------|-----------|-------|
+| `CreateNewApplication()` | external scripts | headless instance, needs a licence, `Application.Mode == Server` |
+| `ConnectAsExtension(n)` | external scripts | `n` = Instance Number shown in the Interactive Extension dialog; `Application.Mode == Plugin` |
+| `ConnectToApplication()` | plug-ins/user analyses OpticStudio launched itself | throws `ArgumentException: This application was not launched by Optic Studio` from an external script |
+| `CreateZemaxServer(name)` | internal only | no `ZemaxServer.exe` in a regular install |
+
+- Wrong instance numbers make `ConnectAsExtension()` return a **non-None stub** with `Mode == Server`, `IsValidLicenseForAPI == False`, `InitializationErrorCode == NotFound`, `PrimarySystem == None` — always test `Mode == Plugin`.
+- Probing is cheap: a wrong instance returns in < 0.1 s, so `zos_utils` scans instances 1–8.
+- The extension stops as soon as the client disconnects, so the GUI button must be clicked again for the next script (`AutoZemax` does this via computer use).
+- `conn.ConnectionTimeoutSeconds` bounds a hanging connect attempt.
 
 ### IApplication Properties
 - `PrimarySystem` — The current optical system
+- `Mode` — `ZOSAPI_Mode` enum: `Server` (standalone) / `Plugin` (interactive extension)
+- `ShowChangesInUI` — interactive only: mirror API changes into the GUI live
 - `SamplesDir` — Path to Zemax sample files
 - `ObjectsDir` — Path to object catalogs
 - `LicenseStatus` — LicenseStatusType enum
@@ -248,12 +268,17 @@ TheNCE.ImportCADFile(filename, ZOSAPI.Editors.NCE.CADImportFormat.STEP, objNum)
 | Real Part | 3 | Real field component |
 | Imaginary Part | 4 | Imaginary field component |
 
-## Library Wrapper Reference (zos_utils.py v0.2.0)
+## Library Wrapper Reference (zos_utils.py v0.3.0)
 
 For common operations, use library wrappers instead of raw API:
 
 | Library Function | Raw API Equivalent |
 |-----------------|-------------------|
+| `ZOSConnection(mode="interactive")` | ConnectAsExtension(instance) |
+| `ZOSConnection(mode="auto")` | probe extension, else CreateNewApplication |
+| `zos.save_interactive_copy()` | SaveAs() to zmx/<stem>_interactive.zos |
+| `zos.set_ui_updates(False)` | Application.ShowChangesInUI = False |
+| `zos.mode` / `zos.is_interactive` / `zos.instance` | Application.Mode inspection |
 | `zos.extract_mtf_data(results)` | Manual DataSeries iteration |
 | `zos.extract_spot_data(results)` | SpotData.GetRMSSpotSizeFor() |
 | `zos.extract_wavefront_data(results)` | DataSeries + safe_reshape() |
@@ -271,6 +296,7 @@ For common operations, use library wrappers instead of raw API:
 
 ## Enums Quick Reference
 
+- **ZOSAPI_Mode**: Server (standalone) | Plugin (interactive extension)
 - **SystemType**: Sequential, NonSequential
 - **FieldType**: Angle, ObjectHeight, ParaxialImageHeight, RealImageHeight
 - **WavelengthPreset** (in `ZOSAPI.SystemData`):

@@ -1,7 +1,7 @@
 ---
 name: sequential-modeling
 description: This skill should be used when the user asks to "add surface", "insert surface", "modify lens data", "set radius", "set thickness", "assign glass", "add solve", "F/# solve", "make variable", "surface property", "add coating", "configure LDE", "lens data editor", "set tilt and decenter", "add merit function operand", "surface aperture", "surface scattering", or edits the sequential Lens Data Editor in Zemax.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # Sequential Mode — Lens Data Editor (LDE)
@@ -19,7 +19,8 @@ import sys, os
 _PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
 for _p in [
     os.path.join(_PLUGIN_ROOT, 'scripts') if _PLUGIN_ROOT else '',
-    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.2.0\scripts',
+    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
+    r'C:\Users\Lex\.codex\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
     r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
 ]:
     if _p and os.path.isdir(_p):

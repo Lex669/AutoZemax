@@ -1,7 +1,7 @@
 ---
 name: sequential-analysis
 description: This skill should be used when the user asks to "run MTF", "FFT MTF", "spot diagram", "ray fan", "wavefront map", "FFT PSF", "read ZRD", "pull analysis data", "extract results", "RMS spot", "field curvature", "distortion", "lateral color", "RMS wavefront", "optical analysis", or performs sequential-mode optical analysis in Zemax and needs to extract numerical results.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # Sequential Analysis — MTF, PSF, Spot Diagrams & More
@@ -17,7 +17,8 @@ import sys, os
 _PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
 for _p in [
     os.path.join(_PLUGIN_ROOT, 'scripts') if _PLUGIN_ROOT else '',
-    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.2.0\scripts',
+    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
+    r'C:\Users\Lex\.codex\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
     r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
 ]:
     if _p and os.path.isdir(_p):

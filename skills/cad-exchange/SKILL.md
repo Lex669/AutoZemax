@@ -1,7 +1,7 @@
 ---
 name: cad-exchange
 description: This skill should be used when the user asks to "export CAD", "import CAD", "STEP file", "IGES export", "CAD exchange", "STL export", "SAT file", "export to STEP", "import CAD model", "CAD format", "open CAD file in NSC", "export solid model", or exchanges CAD geometry between Zemax OpticStudio and mechanical CAD packages.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # CAD Exchange — Export & Import (STEP, IGES, SAT, STL)
@@ -19,7 +19,8 @@ import sys, os
 _PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
 for _p in [
     os.path.join(_PLUGIN_ROOT, 'scripts') if _PLUGIN_ROOT else '',
-    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.2.0\scripts',
+    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
+    r'C:\Users\Lex\.codex\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
     r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
 ]:
     if _p and os.path.isdir(_p):

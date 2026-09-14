@@ -1,7 +1,7 @@
 ---
 name: nsc-scattering
 description: This skill should be used when the user asks to "NSC scattering", "bulk scatter", "phosphor", "volume scattering", "scatter model", "Mie scattering", "scatter function", "white LED", "phosphor layer", "NSC bulk scatter", "Rayleigh scattering", or configures non-sequential scattering models and phosphor layers for LED and lighting simulation in Zemax OpticStudio.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # NSC Scattering — Bulk Scatter, Phosphor & Volume Physics
@@ -18,7 +18,8 @@ import sys, os
 _PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
 for _p in [
     os.path.join(_PLUGIN_ROOT, 'scripts') if _PLUGIN_ROOT else '',
-    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.2.0\scripts',
+    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
+    r'C:\Users\Lex\.codex\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
     r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
 ]:
     if _p and os.path.isdir(_p):

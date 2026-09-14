@@ -1,4 +1,4 @@
-# AutoZemax Python Environment (v0.2.0)
+# AutoZemax Python Environment (v0.3.0)
 
 ## Python Interpreter
 
@@ -56,7 +56,8 @@ import sys, os
 _PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
 for _p in [
     os.path.join(_PLUGIN_ROOT, 'scripts') if _PLUGIN_ROOT else '',
-    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.2.0\scripts',
+    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
+    r'C:\Users\Lex\.codex\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
     r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
 ]:
     if _p and os.path.isdir(_p):
@@ -70,13 +71,49 @@ This resolves the `scripts/` directory across three locations:
 2. Plugin marketplace cache (`~/.claude/plugins/cache/`)
 3. Local development path (fallback)
 
+## Connection Modes
+
+| Mode | Entry point | OpticStudio | Visible | Parallel | Setup |
+|------|-------------|-------------|---------|----------|-------|
+| `standalone` (default) | `CreateNewApplication()` | hidden instance launched by the API | no | yes | none |
+| `interactive` | `ConnectAsExtension(n)` | the GUI the user already has open | yes, live | no | must click Programming → Interactive Extension |
+| `auto` | probe extension, else standalone | whichever is available | maybe | maybe | none |
+
+```python
+with ZOSConnection() as zos:                      # standalone (legacy default)
+with ZOSConnection(mode="interactive") as zos:    # drive the open GUI
+with ZOSConnection(mode="auto") as zos:           # reuse a waiting session
+```
+
+- Selection order: explicit `mode=` → `AUTOZEMAX_MODE` env var → `standalone`.
+- `zos.mode`, `zos.is_interactive`, `zos.instance` report what was actually used.
+- Interactive work must start with `zos.save_interactive_copy()` so the user's
+  original file is never overwritten (SaveAs repoints the GUI at the copy).
+- `zos.set_ui_updates(False)` speeds up bulk edits, `True` replays them live.
+- Failure to reach an armed session raises `ZOSConnection.InteractiveNotAvailable`
+  in well under a second — fall back to `standalone` and say so in the answer.
+- Full bootstrap recipe, caveats and recovery steps: `skills/interactive-session/SKILL.md`.
+
+### Session helper (`scripts/zemax_session.py`)
+
+```powershell
+& "<python>" "<plugin>/scripts/zemax_session.py" status        # processes + windows
+& "<python>" "<plugin>/scripts/zemax_session.py" launch --wait # start GUI, wait for window
+& "<python>" "<plugin>/scripts/zemax_session.py" wait --timeout 90
+```
+
+`status` never connects (connecting would consume a waiting extension session)
+and never terminates processes. Set `AUTOZEMAX_OPTICSTUDIO_EXE` when
+OpticStudio lives outside the standard install paths.
+
 ### Library-Based Approach
 
 Scripts are thin wrappers around `zos_utils.py`. The library provides:
 
 | Module | Key Functions |
 |--------|--------------|
-| Connection | `ZOSConnection()` with context manager, `connect()`, `close()` |
+| Connection | `ZOSConnection(mode=..., instance=...)` with context manager, `connect()`, `close()`, `mode`, `is_interactive`, `instance`, `InteractiveNotAvailable` |
+| Interactive | `save_interactive_copy()`, `set_ui_updates()` |
 | Validation | `validate_system_ready()`, `set_nsc_orientation()`, `set_nsc_position()` |
 | Analysis | `extract_mtf_data()`, `extract_spot_data()`, `extract_wavefront_data()`, `extract_psf_data()`, `extract_ray_fan_data()` |
 | NSC | `create_nsc_detector()`, `create_nsc_source()`, `get_detector_data()`, `get_coherent_data()` |
@@ -96,7 +133,9 @@ Scripts are thin wrappers around `zos_utils.py`. The library provides:
    Close previous connections before starting a new one.
 
 3. **Use the context manager** — `with ZOSConnection() as zos:` automatically closes
-   the connection and releases the OpticStudio server instance.
+   the connection and releases the OpticStudio server instance. In `standalone`
+   mode it also shuts the hidden instance down; in `interactive` mode it only
+   disconnects and never closes the user's OpticStudio.
 
 4. **Matplotlib after cleanup** — call `plt.show()` or `plt.savefig()` AFTER closing
    the ZOS connection. The .NET interop may crash if matplotlib renders while
@@ -109,3 +148,9 @@ Scripts are thin wrappers around `zos_utils.py`. The library provides:
 
 6. **Deterministic seeding** — always call `set_seed(42)` at script start for
    reproducible ray-trace results across runs.
+
+7. **Interactive sessions are one-shot** — the Interactive Extension dialog
+   closes when a client disconnects, so every interactive script needs a fresh
+   click on **Programming → Interactive Extension**. Connecting can also mark
+   the open document as modified; that is why interactive runs must call
+   `save_interactive_copy()` and never save over the user's original file.

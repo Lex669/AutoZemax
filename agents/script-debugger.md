@@ -75,6 +75,11 @@ and zos_utils.py library.
 | Hammer yields no improvement | Template bug: `Cancel()` runs unconditionally | Use `zos.run_hammer_optimization(timeout_sec=N)` — it only cancels if still running |
 | Results differ on every run | No `set_seed()` called | Call `set_seed(42)` at the top of every script |
 | `ZOSConnection.ValidationError` | System missing aperture/fields/wavelengths/materials | Follow the error message — it lists exactly what's missing |
+| `ZOSConnection.InteractiveNotAvailable` | No OpticStudio has its Interactive Extension armed (or it disconnected) | Open OpticStudio and click Programming → Interactive Extension until the dialog reads "Waiting for connection...", then re-run; or use `mode="standalone"` |
+| `ArgumentException: This application was not launched by Optic Studio` | `ConnectToApplication()` was called from an external script | Use `ZOSConnection(mode="interactive")`, which calls `ConnectAsExtension(instance)` |
+| Interactive connect returns None for every instance | Nothing armed, or the extension dialog was already consumed by another client | Re-arm the extension in the GUI; remember a successful connect closes the dialog on disconnect (see `interactive-session` skill) |
+| Interactive system is the wrong file / a copy is expected | Interactive mode works on whatever the GUI has open | Call `zos.save_interactive_copy()` before editing so the original file is untouched |
+| Interactive edits are very slow | `ShowChangesInUI` repaints the GUI on every change | `zos.set_ui_updates(False)` for bulk edits, `True` to replay the result live |
 | MFE operand optimizes wrong parameter | Magic cell number instead of named index | Use `MFE_CELL` constants and `zos.mfe_set_cell()` from zos_utils |
 
 **Library-Specific zos_utils.py Debugging:**

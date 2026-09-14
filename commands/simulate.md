@@ -53,6 +53,10 @@ Before running simulations, verify:
 5. Present results — numerical data, plots, or both
 6. **After completion**, run the `result-analyzer` agent to interpret results
 
+## 连接模式
+
+批量优化/公差/批量分析用默认 `standalone`；用户要"看着跑"时用 `mode="interactive"`（见 `interactive-session` 技能），失败自动回退 standalone。
+
 ## Python Script Template
 
 统一使用 `references/environment.md` 的标准导入模板（`set_seed(42)` + `ZOSConnection` 上下文管理器）和执行命令；具体脚本结构以对应 skill 为准。

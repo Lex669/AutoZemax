@@ -1,7 +1,7 @@
 ---
 name: nsc-modeling
 description: This skill should be used when the user asks to "NSC modeling", "non-sequential", "NSC object", "add source", "add detector", "NSC editor", "create NSC", "NSC geometry", "source ellipse", "source point", "collimated source", "detector rectangle", "NSC position", "NSC orientation", "TiltAboutX", "TiltAboutY", "TiltAboutZ", "NSC material", or creates and configures non-sequential components in Zemax OpticStudio.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # NSC Modeling — Sources, Detectors, Position & Orientation
@@ -19,7 +19,8 @@ import sys, os
 _PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
 for _p in [
     os.path.join(_PLUGIN_ROOT, 'scripts') if _PLUGIN_ROOT else '',
-    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.2.0\scripts',
+    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
+    r'C:\Users\Lex\.codex\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
     r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
 ]:
     if _p and os.path.isdir(_p):

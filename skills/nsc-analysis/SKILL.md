@@ -1,7 +1,7 @@
 ---
 name: nsc-analysis
 description: This skill should be used when the user asks to "NSC analysis", "NSC detector data", "read detector", "get detector data", "NSC phase", "coherent data", "NSC ZRD", "filter string", "NSC ray trace results", "detector irradiance", "coherent phase", or extracts and analyzes results from non-sequential detector objects in Zemax OpticStudio.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # NSC Analysis — Detector Data, Coherent Fields & ZRD Filters
@@ -17,7 +17,8 @@ import sys, os
 _PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
 for _p in [
     os.path.join(_PLUGIN_ROOT, 'scripts') if _PLUGIN_ROOT else '',
-    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.2.0\scripts',
+    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
+    r'C:\Users\Lex\.codex\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
     r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
 ]:
     if _p and os.path.isdir(_p):

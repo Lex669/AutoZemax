@@ -39,6 +39,10 @@ After the user chooses, load the appropriate skill:
 5. Report results back to user; offer to save or continue editing
 6. **After completion**, run the `model-validator` agent to verify the system configuration
 
+## 连接模式
+
+建模调参默认用 `mode="interactive"` 让用户实时看到变化（先 `save_interactive_copy()`）；批量/无人值守用 `standalone`。流程见 `interactive-session` 技能。
+
 ## Python Script Template
 
 Every generated script must use the compact import with `set_seed(42)`:
@@ -48,7 +52,8 @@ import sys, os
 _PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT', '')
 for _p in [
     os.path.join(_PLUGIN_ROOT, 'scripts') if _PLUGIN_ROOT else '',
-    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.2.0\scripts',
+    r'C:\Users\Lex\.claude\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
+    r'C:\Users\Lex\.codex\plugins\cache\AutoSim\AutoZemax\0.3.0\scripts',
     r'C:\Users\Lex\Desktop\AutoSim\AutoZemax\scripts',
 ]:
     if _p and os.path.isdir(_p):

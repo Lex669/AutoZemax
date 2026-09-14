@@ -55,6 +55,10 @@ Extract, visualize, and export results. Use:
 4. If any phase fails, diagnose the issue and offer to retry or adjust
 5. Present final results: plots, reports, and saved file locations
 
+## 连接模式
+
+各阶段默认 `standalone`；用户要求实时查看时用 `mode="interactive"`，并在结果里说明本次实际使用的模式（`interactive-session` 技能含建连与回退流程）。
+
 ## Python Execution
 
 统一使用 `references/environment.md` 的标准导入模板（`set_seed(42)` + `ZOSConnection` 上下文管理器）和执行命令；具体脚本结构以对应 skill 为准。
